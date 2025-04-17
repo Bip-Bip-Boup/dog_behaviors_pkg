@@ -32,9 +32,11 @@ class ObstacleDetection:
                 self.obstacle_detected = is_obstacle
                 self.obstacle_status_pub.publish(Bool(data=is_obstacle))
                 if is_obstacle:
-                    rospy.logwarn("Obstacle detected at %.2f meters!", min_distance)
+                        rospy.logwarn("Obstacle detected at %.2f meters!", min_distance)
+                        twist_msg.linear.x = 0.0
+                        twist_msg.angular.z = 0.5
                 else:
-                    rospy.loginfo("Obstacle cleared.")
+                        rospy.loginfo("Obstacle cleared.")
         else:
             rospy.loginfo("No valid LiDAR data in front range.")
             self.obstacle_detected = False
