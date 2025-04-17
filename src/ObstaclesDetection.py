@@ -1,55 +1,48 @@
 import rospy
-from std_msgs.msg import Int32
-from geometry_msgs.msg import Twist
 from sensor_msgs.msg import LaserScan
+from geometry_msgs.msg import Twist
+from std_msgs.msg import Int32
 
-class ObstacleDetection: 
+class ObstacleDetection:
 
-        def __init__(self):    
-                
-                rospy.init_node('Obstacles Detection', anonymous=True)
-                
-                # Create a publisher (does not send data yet)
-                self.publisher = rospy.Publisher("/cmd_vel", Twist, queue_size=10)
-                
-                sub = rospy.Subscriber("/ball_status", Int32, movement_callback)
-                
-                self.subscriber = rospy.Subscriber('/scan', LaserScan, self.scan_callback)
-                self.obstacle_distance_threshold = 0.25  # meters
-                
-                rospy.spin()
-                
-        def movement_callback(self, msg):
-                if msg == 0: 
-                        print("exploring")
-                pass
-        
+    def __init__(self):
+        rospy.init_node('obstacle_detection', anonymous=True)
 
-        def scan_callback(self, scan_msg):
-                
-                # Focus on the front angle (e.g., 0 ± 45 degrees)
-                scan_range = scan_msg.ranges
-                angle_range = 45
+        self.obstacle_status_pub = rospy.Publisher("/obstacle_status", Bool, queue_size=10)
+        self.subscriber_scan = rospy.Subscriber('/scan', LaserScan, self.scan_callback)
 
-                center_index = len(scan_range) // 2
-                start_index = center_index - angle_range
-                end_index = center_index + angle_range
+        self.obstacle_distance_threshold = 0.25  # meters
+        self.obstacle_detected = False
 
-                # Get relevant ranges and filter out 'inf' or zero
-                front_ranges = [r for r in scan_range[start_index:end_index] if r > 0.0]
+    def scan_callback(self, scan_msg):
+        scan_range = scan_msg.ranges
+        angle_range = 20
 
-                if front_ranges:
-                min_distance = min(front_ranges)
-                
-                if min_distance < self.obstacle_distance_threshold:
-                        rospy.logwarn("Obstacle detected at %.2f meters!", min_distance)
+        center_index = len(scan_range) // 2
+        start_index = max(center_index - angle_range, 0)
+        end_index = min(center_index + angle_range, len(scan_range))
+
+        front_ranges = [r for r in scan_range[start_index:end_index] if 0.0 < r < float('inf')]
+
+        if front_ranges:
+            min_distance = min(front_ranges)
+            is_obstacle = min_distance < self.obstacle_distance_threshold
+
+            if is_obstacle != self.obstacle_detected:
+                self.obstacle_detected = is_obstacle
+                self.obstacle_status_pub.publish(Bool(data=is_obstacle))
+                if is_obstacle:
+                    rospy.logwarn("Obstacle detected at %.2f meters!", min_distance)
                 else:
-                        rospy.loginfo("Path is clear. Closest object at %.2f meters", min_distance)
-                else:
-                rospy.loginfo("No valid LiDAR data in front range.")
+                    rospy.loginfo("Obstacle cleared.")
+        else:
+            rospy.loginfo("No valid LiDAR data in front range.")
+            self.obstacle_detected = False
+            self.obstacle_status_pub.publish(Bool(data=False))
 
 if __name__ == '__main__':
     try:
         ObstacleDetection()
+        rospy.spin()
     except rospy.ROSInterruptException:
         pass

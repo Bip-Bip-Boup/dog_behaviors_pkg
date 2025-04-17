@@ -2,6 +2,7 @@ import rospy
 from sensor_msgs.msg import Image
 from geometry_msgs.msg import Twist
 from std_msgs.msg import String
+from std_msgs.msg import Bool
 import cv2
 import numpy as np
 from cv_bridge import CvBridge, CvBridgeError
@@ -24,6 +25,10 @@ class TurtlebotVisionController:
 
         #Publisher for sound effects
         self.sound_publisher = rospy.Publisher("/sound_type", String, queue_size=10)
+        
+        rospy.Subscriber("/obstacle_status", Bool, self.obstacle_callback)
+        
+        self.obstacle_detected = False
 
         # Define movement speed
         self.forward_speed = 0.05
@@ -37,19 +42,30 @@ class TurtlebotVisionController:
         Callback function to process the received image and detect red objects.
         """
         try:
-                if not self.going_to_ball :
-
-                        # Process the image to detect red color
+                if not self.obstacle_detected:
+                    if not self.going_to_ball:
                         movement_cmd = self.process_image(msg)
                         self.buffer_movement_cmd = movement_cmd
-
-                        # Publish movement command
                         self.publisher.publish(movement_cmd)
-                else:
+                    else:
                         self.publisher.publish(self.buffer_movement_cmd)
+                    else:
+                        # Stop if obstacle is detected
+                        rospy.loginfo("Obstacle detected — stopping TurtleBot.")
+                        stop_cmd = Twist()
+                        self.publisher.publish(stop_cmd)
 
         except CvBridgeError as e:
             rospy.logerr("CvBridge Error: {}".format(e))
+    
+    def obstacle_callback(self, msg):
+        self.obstacle_detected = msg.data
+        if self.obstacle_detected:
+            rospy.loginfo("Obstacle detected — pausing ball pursuit.")
+        else:
+            rospy.loginfo("Path clear — resuming ball pursuit.")
+            
+    
 
     def process_image(self, image):
         """
