@@ -3,26 +3,23 @@ from std_msgs.msg import Int32
 from geometry_msgs.msg import Twist
 from sensor_msgs.msg import LaserScan
 
-
-
 class ObstacleDetection: 
 
         def __init__(self):    
                 
                 rospy.init_node('Obstacles Detection', anonymous=True)
-        
+                
                 # Create a publisher (does not send data yet)
                 self.publisher = rospy.Publisher("/cmd_vel", Twist, queue_size=10)
                 
                 sub = rospy.Subscriber("/ball_status", Int32, movement_callback)
                 
                 self.subscriber = rospy.Subscriber('/scan', LaserScan, self.scan_callback)
-                
-                self.obstacle_distance_threshold = 0.3  # meters
+                self.obstacle_distance_threshold = 0.25  # meters
                 
                 rospy.spin()
                 
-        def movement_callback(msg):
+        def movement_callback(self, msg):
                 if msg == 0: 
                         print("exploring")
                 pass
@@ -30,9 +27,9 @@ class ObstacleDetection:
 
         def scan_callback(self, scan_msg):
                 
-                # Focus on the front angle (e.g., 0 ± 10 degrees)
+                # Focus on the front angle (e.g., 0 ± 45 degrees)
                 scan_range = scan_msg.ranges
-                angle_range = 10
+                angle_range = 45
 
                 center_index = len(scan_range) // 2
                 start_index = center_index - angle_range
@@ -43,6 +40,7 @@ class ObstacleDetection:
 
                 if front_ranges:
                 min_distance = min(front_ranges)
+                
                 if min_distance < self.obstacle_distance_threshold:
                         rospy.logwarn("Obstacle detected at %.2f meters!", min_distance)
                 else:
@@ -52,9 +50,6 @@ class ObstacleDetection:
 
 if __name__ == '__main__':
     try:
-        ObstacleDetector()
+        ObstacleDetection()
     except rospy.ROSInterruptException:
         pass
-
-        if __name__ == '__main__':
-        main()
